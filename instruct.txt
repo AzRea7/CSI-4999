@@ -1,0 +1,3 @@
+
+-Activates virtual environment
+source venv/Scripts/activate
