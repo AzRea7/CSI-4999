@@ -1,45 +1,30 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
-import "./App.css";
+import { Routes, Route, Link } from 'react-router-dom';
+import HomeDashboard from './pages/HomeDashboard';
+import Tasks from './pages/Tasks';
+import HomeSearch from './pages/HomeSearch';
+import ChatBot from './pages/ChatBot';
+import Login from './pages/Login';
 
-function App() {
-  const [count, setCount] = useState(0);
-
-  const fetchAPI = async () => {
-    const response = await axios.get("http:/localhost:8080/api/users");
-    console.log(response.data.users);
-  };
-
-  useEffect(() => {
-    fetchAPI();
-  }, []);
-
+const App = () => {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div>
+      <nav style={{ padding: '10px', background: '#f4f4f4' }}>
+        <Link to="/" style={{ marginRight: '10px' }}>Home</Link>
+        <Link to="/tasks" style={{ marginRight: '10px' }}>Tasks</Link>
+        <Link to="/search" style={{ marginRight: '10px' }}>Search</Link>
+        <Link to="/chatbot" style={{ marginRight: '10px' }}>ChatBot</Link>
+        <Link to="/login">Login</Link>
+      </nav>
+
+      <Routes>
+        <Route path="/" element={<HomeDashboard />} />
+        <Route path="/tasks" element={<Tasks />} />
+        <Route path="/search" element={<HomeSearch />} />
+        <Route path="/chatbot" element={<ChatBot />} />
+        <Route path="/login" element={<Login />} />
+      </Routes>
+    </div>
   );
-}
+};
 
 export default App;
