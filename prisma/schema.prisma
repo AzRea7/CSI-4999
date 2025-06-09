@@ -1,0 +1,45 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("mongodb+srv://rharrison:Ghjk6789@homefinder-cluster1.xivmalg.mongodb.net/?retryWrites=true&w=majority&appName=homeFinder-Cluster1")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  homes     Home[]   // One-to-many: A user can list many homes
+  tasks     Task[]   // One-to-many: A user can have many tasks
+  createdAt DateTime @default(now())
+}
+
+model Home {
+  id          Int      @id @default(autoincrement())
+  title       String
+  address     String
+  price       Int
+  description String?
+  listedById  Int
+  listedBy    User     @relation(fields: [listedById], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model Task {
+  id        Int      @id @default(autoincrement())
+  title     String
+  completed Boolean  @default(false)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
