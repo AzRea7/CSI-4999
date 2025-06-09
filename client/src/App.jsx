@@ -6,10 +6,13 @@ import "./App.css";
 
 function App() {
   const [count, setCount] = useState(0);
+  const [array, setArray] = useState([]);
 
   const fetchAPI = async () => {
-    const response = await axios.get("http:/localhost:8080/api/users");
+    const response = await axios.get("http://localhost:8080/api/users"); // ← fix typo (was missing a second slash)
+
     console.log(response.data.users);
+    setArray(response.data.users);
   };
 
   useEffect(() => {
@@ -31,9 +34,13 @@ function App() {
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
         </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
+
+        {array.map((user, index) => (
+          <div key={index}>
+            <span>{user}</span>
+            <br />
+          </div>
+        ))}
       </div>
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
