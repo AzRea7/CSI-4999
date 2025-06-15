@@ -3,6 +3,7 @@
     "prisma": "^6.9.0"
   },
   "dependencies": {
-    "@prisma/client": "^6.9.0"
+    "@prisma/client": "^6.9.0",
+    "mongodb": "^6.17.0"
   }
 }
