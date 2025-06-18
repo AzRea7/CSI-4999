@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  email           String           @unique
+  password        String
+  homes           Home[]
+  tasks           Task[]
+  recentlyViewed  RecentlyViewed[]
+  createdAt       DateTime         @default(now())
+}
+
+model Home {
+  id               String           @id @default(auto()) @map("_id") @db.ObjectId
+  title            String
+  address          String
+  price            Int
+  description      String?
+  listedBy         User             @relation(fields: [listedById], references: [id])
+  listedById       String           @db.ObjectId
+  recentlyViewedBy RecentlyViewed[]
+  createdAt        DateTime         @default(now())
+}
+
+model Task {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  completed Boolean  @default(false)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model RecentlyViewed {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  user     User     @relation(fields: [userId], references: [id])
+  userId   String   @db.ObjectId
+  home     Home     @relation(fields: [homeId], references: [id])
+  homeId   String   @db.ObjectId
+  viewedAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([homeId])
+  @@unique([userId, homeId])
+}
