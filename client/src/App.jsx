@@ -1,11 +1,33 @@
-import { Routes, Route, Link } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { Routes, Route, Link } from "react-router-dom";
+import axios from "axios";
+import "./App.css";
+
+// Pages from Yousuf-Tasks
 import HomeDashboard from './pages/HomeDashboard';
 import Tasks from './pages/Tasks';
 import HomeSearch from './pages/HomeSearch';
 import ChatBot from './pages/ChatBot';
 import Login from './pages/Login';
 
-const App = () => {
+function App() {
+  const [count, setCount] = useState(0);
+  const [array, setArray] = useState([]);
+
+  const fetchAPI = async () => {
+    try {
+      const response = await axios.get("http://localhost:8080/api/users");
+      console.log(response.data.users);
+      setArray(response.data.users);
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAPI();
+  }, []);
+
   return (
     <div>
       <nav style={{ padding: '10px', background: '#f4f4f4' }}>
@@ -23,8 +45,21 @@ const App = () => {
         <Route path="/chatbot" element={<ChatBot />} />
         <Route path="/login" element={<Login />} />
       </Routes>
+
+      {/* Optional: Retain fetch & counter demo if useful for dev/testing */}
+      <div style={{ padding: '10px' }}>
+        <button onClick={() => setCount(count + 1)}>
+          Count is {count}
+        </button>
+        <div>
+          <h4>Users:</h4>
+          {array.map((user, index) => (
+            <div key={index}>{user}</div>
+          ))}
+        </div>
+      </div>
     </div>
   );
-};
+}
 
 export default App;
