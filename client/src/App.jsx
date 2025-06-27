@@ -47,17 +47,6 @@ function App() {
       </Routes>
 
       {/* Optional: Retain fetch & counter demo if useful for dev/testing */}
-      <div style={{ padding: '10px' }}>
-        <button onClick={() => setCount(count + 1)}>
-          Count is {count}
-        </button>
-        <div>
-          <h4>Users:</h4>
-          {array.map((user, index) => (
-            <div key={index}>{user}</div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
