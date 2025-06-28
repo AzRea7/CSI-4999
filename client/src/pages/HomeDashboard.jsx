@@ -1,8 +1,12 @@
+import { useAuth } from "../AuthContext";
+
 const HomeDashboard = () => {
+  const { user } = useAuth();
+
   return (
     <div>
       <h2>🏡 Home Dashboard</h2>
-      <p>Welcome to your dashboard. Summary and quick links go here.</p>
+      <p>Welcome back, {user?.name} 👋</p>
     </div>
   );
 };
