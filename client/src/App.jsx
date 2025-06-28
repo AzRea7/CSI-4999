@@ -1,53 +1,60 @@
-import { useState, useEffect } from "react";
-import { Routes, Route, Link } from "react-router-dom";
-import axios from "axios";
-import "./App.css";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { AuthProvider } from "./AuthContext";
+import PrivateRoute from "./PrivateRoute";
+import Navbar from "./components/Navbar";
 
-// Pages from Yousuf-Tasks
-import HomeDashboard from './pages/HomeDashboard';
-import Tasks from './pages/Tasks';
-import HomeSearch from './pages/HomeSearch';
-import ChatBot from './pages/ChatBot';
-import Login from './pages/Login';
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Tasks from "./pages/Tasks";
+import HomeDashboard from "./pages/HomeDashboard";
+import ChatBot from "./pages/ChatBot";
+import HomeSearch from "./pages/HomeSearch";
 
 function App() {
-  const [count, setCount] = useState(0);
-  const [array, setArray] = useState([]);
-
-  const fetchAPI = async () => {
-    try {
-      const response = await axios.get("http://localhost:8080/api/users");
-      console.log(response.data.users);
-      setArray(response.data.users);
-    } catch (error) {
-      console.error("Failed to fetch users:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchAPI();
-  }, []);
+  const location = useLocation();
+  const isAuthPage =
+    location.pathname === "/login" || location.pathname === "/register";
 
   return (
-    <div>
-      <nav style={{ padding: '10px', background: '#f4f4f4' }}>
-        <Link to="/" style={{ marginRight: '10px' }}>Home</Link>
-        <Link to="/tasks" style={{ marginRight: '10px' }}>Tasks</Link>
-        <Link to="/search" style={{ marginRight: '10px' }}>Search</Link>
-        <Link to="/chatbot" style={{ marginRight: '10px' }}>ChatBot</Link>
-        <Link to="/login">Login</Link>
-      </nav>
-
+    <AuthProvider>
+      {!isAuthPage && <Navbar />}
       <Routes>
-        <Route path="/" element={<HomeDashboard />} />
-        <Route path="/tasks" element={<Tasks />} />
-        <Route path="/search" element={<HomeSearch />} />
-        <Route path="/chatbot" element={<ChatBot />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <HomeDashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/tasks"
+          element={
+            <PrivateRoute>
+              <Tasks />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/search"
+          element={
+            <PrivateRoute>
+              <HomeSearch />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/chatbot"
+          element={
+            <PrivateRoute>
+              <ChatBot />
+            </PrivateRoute>
+          }
+        />
       </Routes>
-
-      {/* Optional: Retain fetch & counter demo if useful for dev/testing */}
-    </div>
+    </AuthProvider>
   );
 }
 
