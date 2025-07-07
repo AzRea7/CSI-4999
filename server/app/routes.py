@@ -4,6 +4,7 @@ from openai import OpenAI, RateLimitError
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from app.db import db
+from werkzeug.security import generate_password_hash, check_password_hash
 # Test at http://localhost:5000/api/tasks/generate
 
 api = Blueprint("api", __name__)
@@ -93,3 +94,46 @@ def get_task_by_id(task_id):
         })
     except Exception as e:
         return jsonify({"error": f"Invalid ID or error occurred: {str(e)}"}), 400
+    
+@api.route("/register", methods=["POST"])
+def register_user():
+    data = request.get_json()
+    email = data.get("email")
+    name = data.get("name")
+    password = data.get("password")
+
+    if db["User"].find_one({"email": email}):
+        return jsonify({"error": "User already exists"}), 400
+
+    hashed_pw = generate_password_hash(password)
+    result = db["User"].insert_one({
+        "name": name,
+        "email": email,
+        "password": hashed_pw
+    })
+
+    return jsonify({"id": str(result.inserted_id), "email": email}), 201
+
+
+# app/routes.py
+@api.route("/users", methods=["GET"])
+def get_users():
+    users_cursor = db["User"].find()
+    users = [{"id": str(user["_id"]), "name": user["name"], "email": user["email"]} for user in users_cursor]
+    return jsonify({"users": users})
+
+@api.route("/login", methods=["POST"])
+def login_user():
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    user = db["User"].find_one({"email": email})
+    if not user or not check_password_hash(user["password"], password):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    return jsonify({
+        "id": str(user["_id"]),
+        "email": user["email"],
+        "name": user["name"]
+    }), 200
