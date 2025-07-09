@@ -4,6 +4,8 @@ from openai import OpenAI, RateLimitError
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from app.db import db
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 # Test at http://localhost:5000/api/tasks/generate
 
 api = Blueprint("api", __name__)
@@ -93,3 +95,94 @@ def get_task_by_id(task_id):
         })
     except Exception as e:
         return jsonify({"error": f"Invalid ID or error occurred: {str(e)}"}), 400
+
+@api.route("/register", methods=["POST"])
+def register():
+    data = request.get_json()
+    name = data.get("name")
+    email = data.get("email")
+    password = data.get("password")
+
+    if not name or not email or not password:
+        return jsonify({"error": "Missing fields"}), 400
+
+    # Check if user already exists
+    if db["User"].find_one({"email": email}):
+        return jsonify({"error": "Email already registered"}), 409
+
+    # Hash the password
+    hashed_pw = generate_password_hash(password)
+
+    # Insert user into DB
+    db["User"].insert_one({
+        "name": name,
+        "email": email,
+        "password": hashed_pw,
+        "createdAt": datetime.utcnow()
+    })
+
+    return jsonify({"message": "User registered successfully"}), 201
+
+
+@api.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"error": "Missing fields"}), 400
+
+    user = db["User"].find_one({"email": email})
+    if not user or not check_password_hash(user["password"], password):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    return jsonify({
+        "message": "Login successful",
+        "userId": str(user["_id"]),
+        "name": user["name"]
+    }), 200
+
+@api.route("/user/<user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    try:
+        from bson.objectid import ObjectId
+        user_obj_id = ObjectId(user_id)
+
+        # Step 1: Delete user
+        user = db["User"].find_one_and_delete({"_id": user_obj_id})
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Step 2: Delete related data
+        db["Task"].delete_many({ "userId": user_id })
+        db["RecentlyViewed"].delete_many({ "userId": user_id })
+        db["Home"].delete_many({ "listedById": user_id })
+        db["SavedHome"].delete_many({ "userId": user_id })  
+
+
+        return jsonify({ "message": "User and related data deleted successfully" }), 200
+
+    except Exception as e:
+        return jsonify({ "error": f"Error deleting user: {str(e)}" }), 500
+@api.route("/favorites", methods=["POST"])
+def toggle_favorite():
+    data = request.get_json()
+    user_id = data.get("userId")
+    home_id = data.get("homeId")
+
+    if not user_id or not home_id:
+        return jsonify({"error": "Missing userId or homeId"}), 400
+
+    existing = db["SavedHome"].find_one({ "userId": user_id, "homeId": home_id })
+
+    if existing:
+        db["SavedHome"].delete_one({ "_id": existing["_id"] })
+        return jsonify({ "message": "Home removed from favorites" }), 200
+    else:
+        db["SavedHome"].insert_one({
+            "userId": user_id,
+            "homeId": home_id,
+            "savedAt": datetime.utcnow()
+        })
+        return jsonify({ "message": "Home added to favorites" }), 201
