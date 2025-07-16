@@ -11,13 +11,20 @@ const Tasks = () => {
   const [housePrice, setHousePrice] = useState("");
 
   useEffect(() => {
-    axios
-      .get(`${import.meta.env.VITE_API_URL}/tasks`, {
-        params: { user_id: USER_ID },
-      })
-      .then((res) => setTasks(res.data.tasks))
-      .catch((err) => console.error("Failed to fetch tasks:", err));
-  }, []);
+  axios
+    .get(`${import.meta.env.VITE_API_URL}/tasks`, {
+      params: { user_id: USER_ID },
+    })
+    .then((res) => {
+      console.log("API /tasks response:", res.data);
+      setTasks(res.data.tasks || []); // <= fallback to empty array
+    })
+    .catch((err) => {
+      console.error("Failed to fetch tasks:", err);
+      setTasks([]); // fallback on error
+    });
+}, []);
+
 
   const handleGenerate = (e) => {
     e.preventDefault();

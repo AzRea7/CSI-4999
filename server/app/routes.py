@@ -47,18 +47,18 @@ def generate_tasks():
             n=1
         )
         reply = response.choices[0].message.content.strip()
-        print("\n🔍 GPT raw reply:\n", reply)  # log the raw JSON string
+        print("\n GPT raw reply:\n", reply)
     except RateLimitError:
         return jsonify({"error": "OpenAI quota exceeded. Please check your API limits."}), 429
     except Exception as e:
-        print("❌ GPT error:", e)
+        print(" GPT error:", e)
         traceback.print_exc()
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
     try:
         task_objects = json.loads(reply)
     except json.JSONDecodeError:
-        print("❌ Failed to parse GPT response as JSON.")
+        print(" Failed to parse GPT response as JSON.")
         traceback.print_exc()
         return jsonify({"error": "Failed to parse AI response as JSON."}), 500
 
@@ -67,7 +67,7 @@ def generate_tasks():
     for i, task in enumerate(task_objects):
         missing = required_keys - task.keys()
         if missing:
-            print(f"⚠️ Task {i} is missing fields: {missing}")
+            print(f" Task {i} is missing fields: {missing}")
 
     db["Task"].delete_many({"userId": user_id})
     new_tasks = []
@@ -105,9 +105,12 @@ def get_tasks():
 
     cursor = db["Task"].find(query)
     tasks = [{
-        "id": str(t["_id"]),
-        "title": t["title"],
-        "completed": t.get("completed", False)
+    "id": str(t["_id"]),
+    "title": t.get("title", ""),
+    "completed": t.get("completed", False),
+    "category": t.get("category", ""),
+    "priority": t.get("priority", "low"),
+    "due_date": t.get("due_date", "TBD")
     } for t in cursor]
 
     return jsonify({"tasks": tasks})
