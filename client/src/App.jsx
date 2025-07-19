@@ -8,6 +8,7 @@ import Register from "./pages/Register";
 import Tasks from "./pages/Tasks";
 import HomeDashboard from "./pages/HomeDashboard";
 import ChatBot from "./pages/ChatBot";
+import Search from "./pages/HomeSearch";
 import HomeSearch from "./pages/HomeSearch";
 
 function App() {
@@ -41,7 +42,7 @@ function App() {
           path="/search"
           element={
             <PrivateRoute>
-              <HomeSearch />
+              <Search />
             </PrivateRoute>
           }
         />

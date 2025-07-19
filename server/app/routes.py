@@ -7,8 +7,10 @@ from bson.objectid import ObjectId
 from app.db import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson.objectid import ObjectId
+from flask_cors import cross_origin
+from dotenv import load_dotenv
+load_dotenv()
 
-# Test at http://localhost:5000/api/tasks/generate
 
 api = Blueprint("api", __name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -184,3 +186,63 @@ def delete_task(task_id):
     except Exception as e:
         return jsonify({"error": f"Invalid task ID or delete failed: {str(e)}"}), 400
 
+#----- CHAT ---
+@api.route("/chat", methods=["POST"])
+@cross_origin(origins="http://localhost:5173", supports_credentials=True)
+def chat():
+    data = request.get_json()
+    user_message = data.get("message")
+
+    if not user_message:
+        return jsonify({"reply": "Please enter a message."}), 400
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful real estate assistant chatbot."},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=150,
+            temperature=0.7
+        )
+        reply = response.choices[0].message.content.strip()
+    except RateLimitError:
+        return jsonify({"reply": "⚠️ OpenAI quota exceeded. Please try again later."}), 429
+    except Exception as e:
+        print("❌ Chatbot error:", e)
+        return jsonify({"reply": f"⚠️ An error occurred: {str(e)}"}), 500
+
+    return jsonify({"reply": reply})
+
+#------ Search Homes------
+@api.route("/api/homes", methods=["GET"])
+@cross_origin()
+def get_homes():
+    print("🔥 /api/homes route reached")
+
+    city = request.args.get("city")
+    user_id = request.args.get("user_id")
+
+    query = {}
+    if city:
+        query["city"] = {"$regex": city, "$options": "i"}
+    if user_id:
+        query["listedById"] = user_id
+
+    homes = list(db["Home"].find(query))
+
+    results = [
+        {
+            "id": str(home["_id"]),
+            "title": home.get("title", "Untitled"),
+            "price": home.get("price", 0),
+            "city": home.get("city", ""),
+            "image": home.get("image_url", "")
+        }
+        for home in homes
+    ]
+
+    print(f"🔎 Found {len(results)} homes")
+
+    return jsonify({"homes": results})  # always return 200 with array (even if empty)
