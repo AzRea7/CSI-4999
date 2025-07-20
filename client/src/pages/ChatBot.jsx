@@ -25,7 +25,7 @@ const ChatBot = () => {
       console.error("Chatbot error:", error);
       setMessages((prev) => [
         ...prev,
-        { role: "bot", text: "⚠️ Failed to reach chatbot API." },
+        { role: "bot", text: " Failed to reach chatbot API." },
       ]);
     }
 

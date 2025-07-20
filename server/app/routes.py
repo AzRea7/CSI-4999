@@ -208,10 +208,10 @@ def chat():
         )
         reply = response.choices[0].message.content.strip()
     except RateLimitError:
-        return jsonify({"reply": "⚠️ OpenAI quota exceeded. Please try again later."}), 429
+        return jsonify({"reply": " OpenAI quota exceeded. Please try again later."}), 429
     except Exception as e:
-        print("❌ Chatbot error:", e)
-        return jsonify({"reply": f"⚠️ An error occurred: {str(e)}"}), 500
+        print(" Chatbot error:", e)
+        return jsonify({"reply": f" An error occurred: {str(e)}"}), 500
 
     return jsonify({"reply": reply})
 
@@ -219,7 +219,7 @@ def chat():
 @api.route("/api/homes", methods=["GET"])
 @cross_origin()
 def get_homes():
-    print("🔥 /api/homes route reached")
+    print(" /api/homes route reached")
 
     city = request.args.get("city")
     user_id = request.args.get("user_id")
@@ -243,6 +243,6 @@ def get_homes():
         for home in homes
     ]
 
-    print(f"🔎 Found {len(results)} homes")
+    print(f" Found {len(results)} homes")
 
     return jsonify({"homes": results})  # always return 200 with array (even if empty)

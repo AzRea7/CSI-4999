@@ -10,7 +10,7 @@ function HomeSearch() {
     if (!city.trim()) return;
     setLoading(true);
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/homes?city=${city}`);
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/homes?city=${city}`);
       setHomes(response.data.homes);
     } catch (error) {
       console.error("Failed to fetch homes:", error);
