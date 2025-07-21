@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 import os
 import json
 import numpy as np
+import os, pickle
 from openai import OpenAI, RateLimitError
 from pymongo import MongoClient
 from bson.objectid import ObjectId
@@ -13,6 +14,9 @@ from bson.objectid import ObjectId
 
 api = Blueprint("api", __name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+MODEL_PATH = os.path.join(os.path.dirname(file), "model.pkl")
+model = pickle.load(open(MODEL_PATH, 'rb'))  # load the trained model:contentReference[oaicite:5]{index=5}
 
 @api.route("/tasks/generate", methods=["POST"])
 def generate_tasks():
@@ -188,12 +192,10 @@ def delete_task(task_id):
 @api.route("/forecast", methods=["POST"])
 def forecast_price():
     data = request.get_json()
-    # Extract features from JSON (assuming keys like 'area', 'bedrooms', etc.)
     area = data.get("area")
     bedrooms = data.get("bedrooms")
     bathrooms = data.get("bathrooms")
     features = [area, bedrooms, bathrooms]
     final_features = np.array(features).reshape(1, -1)
-    # Make prediction using the loaded model
-    predicted_price = model.predict(final_features)[0]  # single value:contentReference[oaicite:6]{index=6}    
+    predicted_price = model.predict(final_features)[0]  
 
