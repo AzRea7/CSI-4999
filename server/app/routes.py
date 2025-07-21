@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 import os
 import json
+import numpy as np
 from openai import OpenAI, RateLimitError
 from pymongo import MongoClient
 from bson.objectid import ObjectId
@@ -183,4 +184,16 @@ def delete_task(task_id):
         return jsonify({"message": "Task deleted"}), 200
     except Exception as e:
         return jsonify({"error": f"Invalid task ID or delete failed: {str(e)}"}), 400
+    
+@api.route("/forecast", methods=["POST"])
+def forecast_price():
+    data = request.get_json()
+    # Extract features from JSON (assuming keys like 'area', 'bedrooms', etc.)
+    area = data.get("area")
+    bedrooms = data.get("bedrooms")
+    bathrooms = data.get("bathrooms")
+    features = [area, bedrooms, bathrooms]
+    final_features = np.array(features).reshape(1, -1)
+    # Make prediction using the loaded model
+    predicted_price = model.predict(final_features)[0]  # single value:contentReference[oaicite:6]{index=6}    
 
