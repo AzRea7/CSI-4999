@@ -184,3 +184,18 @@ def delete_task(task_id):
     except Exception as e:
         return jsonify({"error": f"Invalid task ID or delete failed: {str(e)}"}), 400
 
+
+@api.route("/listings/<listing_id>", methods=["DELETE"])
+def delete_listing(listing_id):
+    try:
+        result = db["listings"].delete_one({"_id": ObjectId(listing_id)})
+        if result.deleted_count == 0:
+            return jsonify({"error": "Listing not found"}), 404
+
+        # Cascade delete related data
+        db["favorites"].delete_many({"listingId": listing_id})
+        db["Task"].delete_many({"userId": listing_id})  # adjust if tasks are linked differently
+
+        return jsonify({"message": "Listing and related favorites and tasks deleted"}), 200
+    except Exception as e:
+        return jsonify({"error": f"Invalid listing ID or delete failed: {str(e)}"}), 400
