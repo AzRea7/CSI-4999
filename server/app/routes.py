@@ -15,8 +15,8 @@ from bson.objectid import ObjectId
 api = Blueprint("api", __name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-MODEL_PATH = os.path.join(os.path.dirname(file), "model.pkl")
-model = pickle.load(open(MODEL_PATH, 'rb'))  # load the trained model:contentReference[oaicite:5]{index=5}
+#MODEL_PATH = os.path.join(os.path.dirname(__file__), "model.pkl")
+#model = pickle.load(open(MODEL_PATH, 'rb'))  # load the trained model:contentReference[oaicite:5]{index=5}
 
 @api.route("/tasks/generate", methods=["POST"])
 def generate_tasks():
@@ -198,4 +198,24 @@ def forecast_price():
     features = [area, bedrooms, bathrooms]
     final_features = np.array(features).reshape(1, -1)
     predicted_price = model.predict(final_features)[0]  
+
+# ------ CHAT BOT ------
+@api.route("/chat", methods=["POST"])
+def chat():
+    data = request.get_json()
+    user_message = data.get("message")
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful real estate assistant."},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.7,
+        )
+        reply = response.choices[0].message.content.strip()
+        return jsonify({ "reply": reply })
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 500
 

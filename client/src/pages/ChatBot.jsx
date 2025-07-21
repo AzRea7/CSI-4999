@@ -1,8 +1,10 @@
+import React from 'react';
+import Chatbot from '../components/Chatbot'; // Adjust path if different
+
 const ChatBot = () => {
   return (
-    <div>
-      <h2> ChatBot</h2>
-      <p>Chat feature coming soon!</p>
+    <div className="min-h-screen bg-gray-50 p-4">
+      <Chatbot />
     </div>
   );
 };
