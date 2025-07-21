@@ -3,6 +3,7 @@ import { AuthProvider } from "./AuthContext";
 import PrivateRoute from "./PrivateRoute";
 import Navbar from "./components/Navbar";
 
+import Analytics from "./pages/Analytics";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Tasks from "./pages/Tasks";
@@ -26,6 +27,14 @@ function App() {
           element={
             <PrivateRoute>
               <HomeDashboard />
+            </PrivateRoute>
+          }
+        />
+                <Route
+          path="/Analytics"
+          element={
+            <PrivateRoute>
+              <Analytics />
             </PrivateRoute>
           }
         />
