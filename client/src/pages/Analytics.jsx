@@ -1,60 +1,101 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import "../Styles/Analytics.css";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+} from "recharts";
+
+const USER_ID = "demo-user-id-123"; // Replace with actual user ID
 
 const Analytics = () => {
-  const [area, setArea] = useState('');
-  const [bedrooms, setBedrooms] = useState('');
-  const [bathrooms, setBathrooms] = useState('');
-  const [forecastData, setForecastData] = useState(null);
+  const [homes, setHomes] = useState([]);
+  const [selectedHome, setSelectedHome] = useState(null);
+  const [forecastData, setForecastData] = useState([]);
+  const [confidence, setConfidence] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const payload = {
-      area: Number(area), 
-      bedrooms: Number(bedrooms), 
-      bathrooms: Number(bathrooms),
-    };
+  // Load homes from backend
+  useEffect(() => {
+    axios
+      .get(`${import.meta.env.VITE_API_URL}/homes?user_id=${USER_ID}`)
+      .then((res) => setHomes(res.data.homes || []))
+      .catch((err) => console.error("Failed to load homes", err));
+  }, []);
+
+  const handleForecast = async () => {
+    if (!selectedHome) return;
+
+    const { area, bedrooms, bathrooms } = selectedHome;
     try {
-      const res = await fetch('/api/forecast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/forecast`, {
+        area,
+        bedrooms,
+        bathrooms,
       });
-      const data = await res.json();
-      setForecastData(data.forecast);
+      setForecastData(res.data.forecast);
+      setConfidence(res.data.confidence || "");
     } catch (err) {
-      console.error("Error fetching forecast:", err);
+      console.error("Forecast error", err);
     }
   };
 
   return (
-    <div>
-      <h2> Price Forecast</h2>
-      <form onSubmit={handleSubmit} style={{ maxWidth: '400px', marginBottom: '20px' }}>
-        <div>
-          <label>Area (sqft): </label>
-          <input type="number" value={area} onChange={e => setArea(e.target.value)} required />
+    <div className="analytics-container">
+      <h2 className="analytics-title">🏡 Home Price Forecast</h2>
+
+      <div className="home-cards">
+        {homes.map((home) => (
+          <div
+            key={home._id}
+            className={`home-card ${
+              selectedHome?._id === home._id ? "selected" : ""
+            }`}
+            onClick={() => setSelectedHome(home)}
+          >
+            <h3>{home.title || "Untitled"}</h3>
+            <p>
+              {home.area} sqft • {home.bedrooms} bd • {home.bathrooms} ba
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ textAlign: "center", margin: "1rem" }}>
+        <button
+          className="forecast-button"
+          onClick={handleForecast}
+          disabled={!selectedHome}
+        >
+          Forecast
+        </button>
+      </div>
+
+      {forecastData.length > 0 && (
+        <div className="forecast-section">
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={forecastData}>
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <CartesianGrid stroke="#eee" />
+              <Line
+                type="monotone"
+                dataKey="price"
+                stroke="#ff5a5f"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          <p className="model-confidence">
+            Model Confidence: {confidence || "N/A"}%
+          </p>
         </div>
-        <div>
-          <label>Bedrooms: </label>
-          <input type="number" value={bedrooms} onChange={e => setBedrooms(e.target.value)} required />
-        </div>
-        <div>
-          <label>Bathrooms: </label>
-          <input type="number" value={bathrooms} onChange={e => setBathrooms(e.target.value)} required />
-        </div>
-        <button type="submit">Predict Price</button>
-      </form>
-            {forecastData && (
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={forecastData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis domain={['auto', 'auto']} />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="price" stroke="#8884d8" />
-          </LineChart>
-        </ResponsiveContainer>
       )}
     </div>
   );
