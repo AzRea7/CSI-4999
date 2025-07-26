@@ -2,25 +2,25 @@ from flask import Blueprint, jsonify, request
 import os
 import json
 import numpy as np
-import os, pickle
 from openai import OpenAI, RateLimitError
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from app.db import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson.objectid import ObjectId
+import traceback
+from joblib import load
 
 # Test at http://localhost:5000/api/tasks/generate
 
 api = Blueprint("api", __name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-#MODEL_PATH = os.path.join(os.path.dirname(__file__), "model.pkl")
-#model = pickle.load(open(MODEL_PATH, 'rb'))  # load the trained model:contentReference[oaicite:5]{index=5}
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "house_price_model.joblib")
+model = load(MODEL_PATH)
 
 @api.route("/tasks/generate", methods=["POST"])
 def generate_tasks():
-    import traceback  # ensure it's imported for error logs
 
     data = request.get_json()
     credit_score = data.get("credit_score")
@@ -188,16 +188,40 @@ def delete_task(task_id):
         return jsonify({"message": "Task deleted"}), 200
     except Exception as e:
         return jsonify({"error": f"Invalid task ID or delete failed: {str(e)}"}), 400
-    
+
+# ------ FORECAST ------
 @api.route("/forecast", methods=["POST"])
 def forecast_price():
     data = request.get_json()
-    area = data.get("area")
-    bedrooms = data.get("bedrooms")
-    bathrooms = data.get("bathrooms")
-    features = [area, bedrooms, bathrooms]
-    final_features = np.array(features).reshape(1, -1)
-    predicted_price = model.predict(final_features)[0]  
+    print("Received forecast request with data:", data)
+
+    current_year = 2025
+    print("Model contains forecast up to year:", max(model.keys()))
+
+    forecast = []
+    for i in range(1, 6):  # Predict next 5 years
+        future_year = str(current_year + i)
+        price = model.get(future_year)
+
+        if price is not None:
+            forecast.append({
+                "date": future_year,
+                "price": round(price, 2)
+            })
+        else:
+            print(f"No forecast found for year {future_year} in model")
+
+    if not forecast:
+        print("Forecast array is EMPTY. Double-check model contents.")
+
+    return jsonify({
+        "forecast": forecast,
+        "confidence": 75
+    })
+
+
+
+
 
 # ------ CHAT BOT ------
 @api.route("/chat", methods=["POST"])

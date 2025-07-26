@@ -1,53 +1,51 @@
 import os
-import numpy as np
 import pandas as pd
-import kagglehub
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
-import pickle
+from statsmodels.tsa.arima.model import ARIMA
+from joblib import dump
 
-def load_dataset():
-    print(" Downloading dataset from KaggleHub...")
-    dataset_path = kagglehub.dataset_download("yasserh/housing-prices-dataset")
-    csv_path = os.path.join(dataset_path, "Housing.csv")
+# Constants
+DATASET_ID = "prevek18/ames-housing-dataset"
+MODEL_FILENAME = "house_price_model.joblib"
 
-    if not os.path.exists(csv_path):
-        raise FileNotFoundError(f"Housing.csv not found at {csv_path}")
+def download_dataset():
+    import kagglehub
+    dataset_path = kagglehub.dataset_download(DATASET_ID)
+    return os.path.join(dataset_path, "AmesHousing.csv")
 
-    print(f" Loading dataset from: {csv_path}")
-    return pd.read_csv(csv_path)
+def load_data(filepath):
+    df = pd.read_csv(filepath)
+    df = df.loc[:, ~df.columns.str.contains('#NAME?', case=False, na=False)]
+    df = df[["Yr Sold", "SalePrice"]].dropna()
+    df.columns = ["year", "price"]
+    return df
 
-def train_model(df):
-    print(" Selecting features and target")
-    X = df[["area", "bedrooms", "bathrooms"]]
-    y = df["price"]
+def train_arima(df):
+    # Aggregate average price per year
+    yearly = df.groupby("year")["price"].mean()
+    
+    print("Yearly averages:")
+    print(yearly)
 
-    # Optionally add data validation or fillna if needed later
-    # X.fillna(0, inplace=True)
+    # Train ARIMA model (simple ARIMA(1,1,1))
+    model = ARIMA(yearly, order=(1, 1, 1))
+    fitted_model = model.fit()
 
-    print(" Training Linear Regression model...")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    model = LinearRegression()
-    model.fit(X_train, y_train)
+    # Forecast next 20 years
+    FUTURE_YEARS = 20  # Forecast 20 years beyond last year in dataset
+    future = fitted_model.forecast(steps=FUTURE_YEARS)
+    future_years = list(range(yearly.index.max() + 1, yearly.index.max() + 1 + FUTURE_YEARS))
 
-    y_pred = model.predict(X_test)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    r2 = r2_score(y_test, y_pred)
+    forecast = {str(year): round(price, 2) for year, price in zip(future_years, future)}
+    print("📈 Forecast:", forecast)
 
-    print(f" Model trained. R²: {r2:.2f}, RMSE: {rmse:.2f}")
-    return model
+    return forecast
 
-def save_model(model, filename="model.pkl"):
-    model_path = os.path.join(os.path.dirname(__file__), filename)
-    with open(model_path, "wb") as f:
-        pickle.dump(model, f)
-    print(f" Model saved to: {model_path}")
+def main():
+    path = download_dataset()
+    df = load_data(path)
+    forecast_dict = train_arima(df)
+    dump(forecast_dict, MODEL_FILENAME)
+    print(f"Forecast saved to {MODEL_FILENAME}")
 
 if __name__ == "__main__":
-    try:
-        df = load_dataset()
-        model = train_model(df)
-        save_model(model)
-    except Exception as e:
-        print(f" Error during model training: {e}")
+    main()

@@ -1,56 +1,64 @@
 .analytics-container {
   padding: 2rem;
-  font-family: 'Helvetica Neue', sans-serif;
+  max-width: 960px;
+  margin: auto;
 }
 
 .analytics-title {
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin-bottom: 1rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 1.5rem;
+  text-align: center;
 }
 
 .home-cards {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-  margin-bottom: 1rem;
+  justify-content: center;
 }
 
 .home-card {
-  background-color: #ffffff;
   border: 1px solid #ddd;
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 1rem;
   width: 220px;
+  background-color: #f9f9f9;
   cursor: pointer;
-  box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .home-card:hover {
-  border-color: #ff5a5f;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+  border-color: #ccc;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .home-card.selected {
   border: 2px solid #ff5a5f;
-  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.12);
+  background-color: #fff5f5;
 }
 
 .forecast-button {
-  background-color: #ff5a5f;
+  background-color: #3B82F6;
   color: white;
-  border: none;
-  padding: 10px 20px;
   font-weight: 600;
-  font-size: 1rem;
+  padding: 0.6rem 1.5rem;
+  border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
 }
 
-.forecast-button:hover {
-  background-color: #e74c4c;
+.forecast-button:hover:not(:disabled) {
+  background-color: #333;
+}
+
+.forecast-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .forecast-section {
@@ -59,7 +67,7 @@
 
 .model-confidence {
   text-align: center;
-  font-size: 1rem;
-  color: #555;
   margin-top: 1rem;
+  color: #555;
+  font-size: 1rem;
 }
