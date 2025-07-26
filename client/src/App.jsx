@@ -11,6 +11,7 @@ import Tasks from "./pages/Tasks";
 import HomeDashboard from "./pages/HomeDashboard";
 import ChatBot from "./pages/ChatBot";
 import HomeSearch from "./pages/HomeSearch";
+import Search from "./pages/Search";
 
 function App() {
   const location = useLocation();
@@ -51,7 +52,7 @@ function App() {
           path="/search"
           element={
             <PrivateRoute>
-              <HomeSearch />
+              <Search />
             </PrivateRoute>
           }
         />

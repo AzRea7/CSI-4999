@@ -19,7 +19,7 @@ const HomeDashboard = () => {
     if (!user) return;
     // Get current tasks for the user
     axios
-      .get(`${import.meta.env.VITE_API_URL}/tasks`, {
+      .get("http://localhost:5000/api/tasks", {
         params: { user_id: USER_ID },
       })
       .then((res) => setTasks(res.data.tasks))
@@ -27,11 +27,14 @@ const HomeDashboard = () => {
 
     // Get favorited homes for the user (assuming an API endpoint exists)
     axios
-      .get(`${import.meta.env.VITE_API_URL}/homes`, {
+      .get("http://localhost:5000/api/homes", {
         params: { user_id: user.id },
       })
-      .then((res) => setFavorites(res.data.homes))
-      .catch((err) => console.error("Failed to fetch favorite homes:", err));
+      .then((res) => setFavorites(res.data.results || []))
+      .catch((err) => {
+        console.error("Failed to fetch favorite homes:", err);
+        setFavorites([]); // Set to empty array on error
+      });
   }, [user]);
 
   // Handle mortgage calculation form submission
@@ -57,7 +60,7 @@ const HomeDashboard = () => {
 
   const handleComplete = async (taskId) => {
     try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/tasks/${taskId}`);
+      await axios.delete(`http://localhost:5000/api/tasks/${taskId}`);
       // Update local tasks state by filtering out the completed task
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
     } catch (err) {
@@ -173,7 +176,7 @@ const HomeDashboard = () => {
         {/* Favorited Homes Card */}
         <div className="bg-gray-50 p-6 rounded-2xl shadow-sm">
           <h3 className="text-xl font-semibold mb-4 text-gray-800">Favorited Homes</h3>
-          {favorites.length > 0 ? (
+          {favorites && favorites.length > 0 ? (
             <div className="space-y-3">
               {favorites.map((home) => (
                 <div

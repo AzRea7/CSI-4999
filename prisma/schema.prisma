@@ -22,7 +22,11 @@ model Home {
   id               String           @id @default(auto()) @map("_id") @db.ObjectId
   title            String
   address          String
+  city             String?
   price            Int
+  bedrooms         Int?
+  bathrooms        Int?
+  image            String?
   description      String?
   listedBy         User             @relation(fields: [listedById], references: [id])
   listedById       String           @db.ObjectId

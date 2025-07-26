@@ -9,7 +9,7 @@ const Search = () => {
   const handleSearch = async () => {
     setError(null);
     try {
-      const response = await axios.get("http://localhost:5050/api/search", {
+      const response = await axios.get("http://localhost:5000/api/search", {
         params: { q: query },
         withCredentials: false,
       });

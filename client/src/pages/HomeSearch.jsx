@@ -10,7 +10,6 @@ const HomeSearch = () => {
 
   return (
     <div>
-      <h2>🔍 Home Search</h2>
       <input
         type="text"
         placeholder="Search homes..."

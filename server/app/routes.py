@@ -219,3 +219,152 @@ def chat():
     except Exception as e:
         return jsonify({ "error": str(e) }), 500
 
+# ------ SEARCH HOMES ------
+@api.route("/search", methods=["GET"])
+def search_homes():
+    query = request.args.get("q", "").strip()
+    
+    if not query:
+        return jsonify({"results": []})
+    
+    try:
+        # Search for homes by title, city, or address (case-insensitive)
+        homes = db["Home"].find({
+            "$or": [
+                {"title": {"$regex": query, "$options": "i"}},
+                {"city": {"$regex": query, "$options": "i"}},
+                {"address": {"$regex": query, "$options": "i"}}
+            ]
+        })
+        
+        results = []
+        for home in homes:
+            # Convert ObjectId to string for JSON serialization
+            home["_id"] = str(home["_id"])
+            home["listedById"] = str(home["listedById"])
+            
+            # Map the fields to match what the frontend expects
+            result = {
+                "id": home["_id"],
+                "title": home["title"],
+                "city": home.get("city", home.get("address", "Unknown")),
+                "price": home["price"],
+                "bedrooms": home.get("bedrooms", 0),
+                "bathrooms": home.get("bathrooms", 0),
+                "image": home.get("image")
+            }
+            results.append(result)
+        
+        return jsonify({"results": results})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ------ ADD SAMPLE HOMES (for testing) ------
+@api.route("/homes/sample", methods=["POST"])
+def add_sample_homes():
+    try:
+        # First, check if we have any users to assign homes to
+        users = list(db["User"].find())
+        if not users:
+            return jsonify({"error": "No users found. Create a user first."}), 400
+        
+        user_id = users[0]["_id"]  # Use the first user
+        
+        sample_homes = [
+            {
+                "title": "Modern Condo in Miami",
+                "address": "123 Ocean Drive, Miami, FL",
+                "city": "Miami",
+                "price": 1800,
+                "bedrooms": 2,
+                "bathrooms": 2,
+                "image": "https://via.placeholder.com/400x300",
+                "description": "Beautiful modern condo with ocean view",
+                "listedById": user_id
+            },
+            {
+                "title": "Cozy Apartment in Chicago",
+                "address": "456 Michigan Ave, Chicago, IL",
+                "city": "Chicago", 
+                "price": 1400,
+                "bedrooms": 1,
+                "bathrooms": 1,
+                "image": "https://via.placeholder.com/400x300",
+                "description": "Cozy downtown apartment",
+                "listedById": user_id
+            },
+            {
+                "title": "House in LA",
+                "address": "789 Sunset Blvd, Los Angeles, CA",
+                "city": "Los Angeles",
+                "price": 2200,
+                "bedrooms": 3,
+                "bathrooms": 2,
+                "image": "https://via.placeholder.com/400x300", 
+                "description": "Spacious house in LA",
+                "listedById": user_id
+            },
+            {
+                "title": "Downtown Loft in New York",
+                "address": "101 Broadway, New York, NY",
+                "city": "New York",
+                "price": 3500,
+                "bedrooms": 2,
+                "bathrooms": 1,
+                "image": "https://via.placeholder.com/400x300",
+                "description": "Modern loft in Manhattan",
+                "listedById": user_id
+            },
+            {
+                "title": "Beach House in San Diego",
+                "address": "555 Coastal Blvd, San Diego, CA",
+                "city": "San Diego",
+                "price": 2800,
+                "bedrooms": 4,
+                "bathrooms": 3,
+                "image": "https://via.placeholder.com/400x300",
+                "description": "Beautiful beachfront property",
+                "listedById": user_id
+            }
+        ]
+        
+        # Insert sample homes
+        result = db["Home"].insert_many(sample_homes)
+        return jsonify({
+            "message": f"Added {len(result.inserted_ids)} sample homes",
+            "ids": [str(id) for id in result.inserted_ids]
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ------ GET ALL HOMES ------
+@api.route("/homes", methods=["GET"])
+def get_all_homes():
+    try:
+        homes = db["Home"].find()
+        results = []
+        
+        for home in homes:
+            # Convert ObjectId to string for JSON serialization
+            home["_id"] = str(home["_id"])
+            home["listedById"] = str(home["listedById"])
+            
+            # Map the fields to match what the frontend expects
+            result = {
+                "id": home["_id"],
+                "title": home["title"],
+                "city": home.get("city", home.get("address", "Unknown")),
+                "price": home["price"],
+                "bedrooms": home.get("bedrooms", 0),
+                "bathrooms": home.get("bathrooms", 0),
+                "image": home.get("image")
+            }
+            results.append(result)
+        
+        return jsonify({"results": results})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
