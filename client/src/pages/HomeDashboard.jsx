@@ -12,30 +12,31 @@ const HomeDashboard = () => {
   const [favorites, setFavorites] = useState([]);   // Favorited homes
   const [tasks, setTasks] = useState([]);           // Current tasks
 
-  const USER_ID = "demo-user-id-123";
+  const USER_ID = user?.id;
 
-  // Fetch tasks and favorite homes for the user on component mount/update
-  useEffect(() => {
-    if (!user) return;
-    // Get current tasks for the user
-    axios
-      .get("http://localhost:5000/api/tasks", {
-        params: { user_id: USER_ID },
-      })
-      .then((res) => setTasks(res.data.tasks))
-      .catch((err) => console.error("Failed to fetch tasks:", err));
+// Fetch tasks and favorite homes for the user on component mount/update
+useEffect(() => {
+  if (!user?.id) return;
 
-    // Get favorited homes for the user (assuming an API endpoint exists)
-    axios
-      .get("http://localhost:5000/api/homes", {
-        params: { user_id: user.id },
-      })
-      .then((res) => setFavorites(res.data.results || []))
-      .catch((err) => {
-        console.error("Failed to fetch favorite homes:", err);
-        setFavorites([]); // Set to empty array on error
-      });
-  }, [user]);
+  // Get current tasks for the user
+  axios
+    .get("http://localhost:5000/api/tasks", {
+      params: { user_id: USER_ID },
+    })
+    .then((res) => setTasks(res.data.tasks))
+    .catch((err) => console.error("Failed to fetch tasks:", err));
+
+  // Get favorited homes for the user (✅ use /api/favorites now)
+  axios
+    .get("http://localhost:5000/api/favorites", {
+      params: { userId: USER_ID }, // must match what backend expects
+    })
+    .then((res) => setFavorites(res.data.favorites || []))
+    .catch((err) => {
+      console.error("Failed to fetch favorite homes:", err);
+      setFavorites([]); // Set to empty array on error
+    });
+}, [user?.id]);
 
   // Handle mortgage calculation form submission
   const handleCalculate = (e) => {
@@ -173,29 +174,38 @@ const HomeDashboard = () => {
           )}
         </div>
 
-        {/* Favorited Homes Card */}
-        <div className="bg-gray-50 p-6 rounded-2xl shadow-sm">
-          <h3 className="text-xl font-semibold mb-4 text-gray-800">Favorited Homes</h3>
-          {favorites && favorites.length > 0 ? (
-            <div className="space-y-3">
-              {favorites.map((home) => (
-                <div
-                  key={home.id}
-                  className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm"
-                >
-                  <h4 className="text-md font-medium text-gray-800">{home.title}</h4>
-                  <p className="text-sm text-gray-600">
-                    ${home.price?.toLocaleString("en-US")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-600">You have no favorited homes yet.</p>
-          )}
+{/* Favorited Homes Card */}
+<div className="bg-gray-50 p-6 rounded-2xl shadow-sm">
+  <h3 className="text-xl font-semibold mb-4 text-gray-800">Favorited Homes</h3>
+  {favorites && favorites.length > 0 ? (
+    <div className="space-y-3">
+      {favorites.map((home) => (
+        <div
+          key={home._id}
+          className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm flex gap-4"
+        >
+          <img
+            src={home.image || "https://via.placeholder.com/100"}
+            alt={home.title}
+            className="w-24 h-24 object-cover rounded"
+          />
+          <div>
+            <h4 className="text-md font-medium text-gray-800">{home.title}</h4>
+            <p className="text-sm text-gray-600">{home.city}</p>
+            <p className="text-sm font-bold text-gray-800">
+              ${home.price?.toLocaleString("en-US")}
+            </p>
+            <p className="text-xs text-gray-500">
+              {home.bedrooms} bed / {home.bathrooms} bath
+            </p>
+          </div>
         </div>
-
-        
+      ))}
+    </div>
+  ) : (
+    <p className="text-gray-600">You have no favorited homes yet.</p>
+  )}
+</div>  
       </div>
     </div>
   );
