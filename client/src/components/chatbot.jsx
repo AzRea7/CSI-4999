@@ -14,7 +14,7 @@ const Chatbot = () => {
     setMessage('');
 
     try {
-      const res = await axios.post('http://localhost:5050/chat', { message });
+      const res = await axios.post('http://localhost:5000/api/chat', { message });
       const reply = res.data.reply;
       setChat([...newChat, { sender: 'bot', text: reply }]);
     } catch (err) {
@@ -33,7 +33,7 @@ const Chatbot = () => {
 
   return (
     <div className="p-4 max-w-2xl mx-auto bg-black rounded shadow-lg">
-      <h2 className="text-2xl font-bold mb-4 text-center">Ask our Real Estate Chatbot</h2>
+      <h2 className="text-2xl font-bold mb-4 text-center text-white">Ask our Real Estate Chatbot</h2>
 
       <div className="h-80 overflow-y-auto border p-4 mb-4 bg-gray-100 rounded space-y-3">
         {chat.length === 0 ? (
@@ -60,7 +60,7 @@ const Chatbot = () => {
       <div className="flex gap-2">
         <input
           type="text"
-          className="flex-1 p-2 border rounded focus:outline-none focus:ring"
+          className="flex-1 p-2 border rounded focus:outline-none focus:ring bg-white text-black"
           placeholder="Type your message and hit Enter..."
           value={message}
           onChange={(e) => setMessage(e.target.value)}

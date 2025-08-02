@@ -2,25 +2,26 @@ from flask import Blueprint, jsonify, request
 import os
 import json
 import numpy as np
-import os, pickle
 from openai import OpenAI, RateLimitError
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from app.db import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson.objectid import ObjectId
+import traceback
+from joblib import load
+import requests
 
 # Test at http://localhost:5000/api/tasks/generate
 
 api = Blueprint("api", __name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-#MODEL_PATH = os.path.join(os.path.dirname(__file__), "model.pkl")
-#model = pickle.load(open(MODEL_PATH, 'rb'))  # load the trained model:contentReference[oaicite:5]{index=5}
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "house_price_model.joblib")
+model = load(MODEL_PATH)
 
 @api.route("/tasks/generate", methods=["POST"])
 def generate_tasks():
-    import traceback  # ensure it's imported for error logs
 
     data = request.get_json()
     credit_score = data.get("credit_score")
@@ -188,16 +189,55 @@ def delete_task(task_id):
         return jsonify({"message": "Task deleted"}), 200
     except Exception as e:
         return jsonify({"error": f"Invalid task ID or delete failed: {str(e)}"}), 400
-    
-@api.route("/forecast", methods=["POST"])
-def forecast_price():
-    data = request.get_json()
-    area = data.get("area")
-    bedrooms = data.get("bedrooms")
-    bathrooms = data.get("bathrooms")
-    features = [area, bedrooms, bathrooms]
-    final_features = np.array(features).reshape(1, -1)
-    predicted_price = model.predict(final_features)[0]  
+
+# ------ FORECAST ------
+@api.route("/forecast/favorites", methods=["GET"])
+def forecast_all_favorites():
+    user_id = request.args.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    # Find all favorites for the user
+    favorites = list(db["Favorite"].find({"userId": user_id}))
+    if not favorites:
+        return jsonify({"error": "No favorites found"}), 404
+
+    current_year = 2025
+    results = []
+
+    for fav in favorites:
+        base_price = fav.get("price")
+        if not base_price:
+            continue  # Skip if no price is stored
+
+        forecast = []
+        for i in range(1, 6):  # Predict next 5 years
+            year = str(current_year + i)
+            if year in model:
+                forecast.append({
+                    "date": year,
+                    "price": round(base_price * (model[year] / list(model.values())[0]), 2)
+                })
+
+        results.append({
+            "home": {
+                "zpid": fav.get("zpid"),
+                "title": fav.get("title"),
+                "city": fav.get("city"),
+                "price": base_price,
+                "bedrooms": fav.get("bedrooms"),
+                "bathrooms": fav.get("bathrooms"),
+                "image": fav.get("image")
+            },
+            "forecast": forecast
+        })
+
+    return jsonify({"forecasts": results})
+
+
+
+
+
 
 # ------ CHAT BOT ------
 @api.route("/chat", methods=["POST"])
@@ -219,18 +259,146 @@ def chat():
     except Exception as e:
         return jsonify({ "error": str(e) }), 500
 
+# ------ SEARCH HOMES ------
+@api.route("/search", methods=["GET"])
+def search_homes():
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"results": []})
 
-@api.route("/listings/<listing_id>", methods=["DELETE"])
-def delete_listing(listing_id):
+    RAPIDAPI_KEY = os.getenv("ZILLOW_API_KEY")
+    if not RAPIDAPI_KEY:
+        return jsonify({"error": "ZILLOW_API_KEY not configured"}), 500
+
+    headers = {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": "zillow-com1.p.rapidapi.com"
+    }
+
+    url = "https://zillow-com1.p.rapidapi.com/propertyExtendedSearch"
+    params = {
+        "location": query,
+        "status_type": "ForSale",   # Or "ForRent" if you want rentals
+        "home_type": "Houses"       # Optional: can remove if you want all types
+    }
+
     try:
-        result = db["listings"].delete_one({"_id": ObjectId(listing_id)})
-        if result.deleted_count == 0:
-            return jsonify({"error": "Listing not found"}), 404
+        resp = requests.get(url, headers=headers, params=params)
+        data = resp.json()
 
-        # Cascade delete related data
-        db["favorites"].delete_many({"listingId": listing_id})
-        db["Task"].delete_many({"userId": listing_id})  # adjust if tasks are linked differently
+        import json
+        print("RAW ZILLOW RESPONSE:")
+        print(json.dumps(data, indent=2))
 
-        return jsonify({"message": "Listing and related favorites and tasks deleted"}), 200
+
+        # Directly get props array
+        items = data.get("props", [])
+        results = []
+
+        for item in items:
+            results.append({
+                "id": str(item.get("zpid", "")),
+                "title": item.get("address", "").split(",")[0] if item.get("address") else "Unknown",
+                "city": extract_city(item.get("address", "")),
+                "price": item.get("price", 0),
+                "bedrooms": item.get("bedrooms", 0),
+                "bathrooms": item.get("bathrooms", 0),
+                "image": item.get("imgSrc")
+            })
+
+        return jsonify({"results": results})
+
     except Exception as e:
-        return jsonify({"error": f"Invalid listing ID or delete failed: {str(e)}"}), 400
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+def extract_city(address):
+    """Extract city from Zillow's address string."""
+    try:
+        parts = address.split(",")
+        return parts[1].strip() if len(parts) > 1 else "Unknown"
+    except Exception:
+        return "Unknown"
+
+def parse_property_summary(item):
+    """Map Zillow search result to our frontend format."""
+    return {
+        "id": str(item.get("zpid", "")),
+        "title": item.get("address", "").split(",")[0] if item.get("address") else "Unknown",
+        "city": extract_city(item.get("address", "")),
+        "price": item.get("price", 0),
+        "bedrooms": item.get("bedrooms", 0),
+        "bathrooms": item.get("bathrooms", 0),
+        "image": item.get("imgSrc", None)
+    }
+
+def parse_property_detail(data):
+    """Map Zillow single property detail to our frontend format."""
+    return {
+        "id": str(data.get("zpid", "")),
+        "title": data.get("address", "").split(",")[0] if data.get("address") else "Unknown",
+        "city": extract_city(data.get("address", "")),
+        "price": data.get("price", 0),
+        "bedrooms": data.get("bedrooms", 0),
+        "bathrooms": data.get("bathrooms", 0),
+        "image": (data.get("imgSrc") or 
+                  (data.get("photos", [{}])[0].get("url") if data.get("photos") else None))
+    }
+
+
+# ------ Favorites ------
+
+@api.route("/favorites", methods=["POST"])
+def add_favorite():
+    data = request.get_json()
+    user_id = data.get("userId")
+    zpid = data.get("zpid")
+
+    if not user_id or not zpid:
+        return jsonify({"error": "userId and zpid are required"}), 400
+
+    # Prevent duplicates
+    existing = db["Favorite"].find_one({"userId": user_id, "zpid": zpid})
+    if existing:
+        return jsonify({"message": "Already favorited"}), 200
+
+    favorite_doc = {
+        "userId": user_id,
+        "zpid": zpid,
+        "title": data.get("title"),
+        "city": data.get("city"),
+        "price": data.get("price"),
+        "bedrooms": data.get("bedrooms"),
+        "bathrooms": data.get("bathrooms"),
+        "image": data.get("image")
+    }
+    db["Favorite"].insert_one(favorite_doc)
+    return jsonify({"message": "Favorite added"}), 201
+
+
+@api.route("/favorites", methods=["GET"])
+def get_favorites():
+    user_id = request.args.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId required"}), 400
+
+    cursor = db["Favorite"].find({"userId": user_id})
+    results = []
+    for fav in cursor:
+        fav["_id"] = str(fav["_id"])
+        results.append(fav)
+    
+    # Always return 200 with an empty array instead of 404
+    return jsonify({"favorites": results})
+
+
+
+@api.route("/favorites/<fav_id>", methods=["DELETE"])
+def remove_favorite(fav_id):
+    try:
+        result = db["Favorite"].delete_one({"_id": ObjectId(fav_id)})
+        if result.deleted_count == 0:
+            return jsonify({"error": "Favorite not found"}), 404
+        return jsonify({"message": "Favorite removed"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

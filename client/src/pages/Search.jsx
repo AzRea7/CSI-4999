@@ -1,45 +1,70 @@
-import { useState } from "react";
-import axios from "axios";
+import React, { useState } from 'react';
+import axios from 'axios';
+import { useAuth } from '../AuthContext';
 
 const Search = () => {
-  const [query, setQuery] = useState("");
+  const { user } = useAuth(); // Assuming useAuth is available
+  const [search, setSearch] = useState('');
   const [homes, setHomes] = useState([]);
   const [error, setError] = useState(null);
 
-  const handleSearch = async () => {
+  const performSearch = async () => {
     setError(null);
     try {
-      const response = await axios.get("http://localhost:5050/api/search", {
-        params: { q: query },
-        withCredentials: false,
+      const resp = await axios.get("http://localhost:5000/api/search", {
+        params: { q: search },
       });
-      setHomes(response.data.results);
+      setHomes(resp.data.results || []);
     } catch (err) {
       console.error(err);
       setError("Search failed. Try again.");
     }
   };
 
+const addFavorite = async (home) => {
+    if (!user?.id) {
+      alert("You must be logged in to favorite a home.");
+      return;
+    }
+    try {
+      await axios.post("http://localhost:5000/api/favorites", {
+        userId: user.id, // ✅ real logged-in user ID
+        zpid: home.id,
+        title: home.title,
+        city: home.city,
+        price: home.price,
+        bedrooms: home.bedrooms,
+        bathrooms: home.bathrooms,
+        image: home.image
+      });
+      alert("Added to favorites!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add favorite.");
+    }
+  };
+
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Search Homes</h1>
+      <h2 className="text-xl font-bold mb-4">Search Homes</h2>
       <div className="flex gap-2 mb-4">
         <input
           type="text"
-          placeholder="Enter city or title..."
-          className="p-2 border rounded w-full"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Enter city, address, or Zillow ID..."
+          className="border p-2 rounded w-full"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && performSearch()}
         />
         <button
           className="bg-blue-500 text-white px-4 py-2 rounded"
-          onClick={handleSearch}
+          onClick={performSearch}
         >
           Search
         </button>
       </div>
 
-      {error && <div className="text-red-500 mb-2">{error}</div>}
+      {error && <p className="text-red-500">{error}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {homes.map((home) => (
@@ -48,14 +73,24 @@ const Search = () => {
             className="border p-4 rounded shadow hover:shadow-md transition"
           >
             <img
-              src={home.image || "https://via.placeholder.com/150"}
+              src={home.image || "https://via.placeholder.com/300"}
               alt={home.title}
               className="w-full h-40 object-cover mb-2 rounded"
             />
-            <h2 className="text-lg font-semibold">{home.title}</h2>
-            <p>City: {home.city}</p>
-            <p>Price: ${home.price}</p>
-            <p>{home.bedrooms} bed / {home.bathrooms} bath</p>
+            <h3 className="font-semibold">{home.title}</h3>
+            <p className="text-sm text-gray-600">{home.city}</p>
+            <p className="font-bold">${home.price}</p>
+            <p className="text-sm">
+              {home.bedrooms} bed / {home.bathrooms} bath
+            </p>
+            {/* Favorite button */}
+            <button
+              className="bg-yellow-500 text-white px-3 py-1 rounded mt-2 hover:bg-yellow-600"
+              onClick={() => addFavorite(home)}
+              style={{ backgroundColor: "#3B82F6" }}
+            >
+              Favorite
+            </button>
           </div>
         ))}
       </div>

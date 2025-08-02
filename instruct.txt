@@ -1,3 +1,15 @@
 
 -Activates virtual environment
 source venv/Scripts/activate
+
+-Start backend
+python -m flask --app app:create_app run --host=127.0.0.1 --port=5000
+
+-start frontend
+npm run dev
+
+- load dataset
+python download_dataset.py
+
+-train dataset
+python train_model.py

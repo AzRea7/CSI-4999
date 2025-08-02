@@ -1,5 +1,5 @@
 import React from 'react';
-import Chatbot from '../components/Chatbot'; // Adjust path if different
+import Chatbot from '../components/chatbot'; // Adjust path if different
 
 const ChatBot = () => {
   return (
