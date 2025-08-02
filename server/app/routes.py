@@ -10,6 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from bson.objectid import ObjectId
 import traceback
 from joblib import load
+import requests
 
 # Test at http://localhost:5000/api/tasks/generate
 
@@ -190,34 +191,49 @@ def delete_task(task_id):
         return jsonify({"error": f"Invalid task ID or delete failed: {str(e)}"}), 400
 
 # ------ FORECAST ------
-@api.route("/forecast", methods=["POST"])
-def forecast_price():
-    data = request.get_json()
-    print("Received forecast request with data:", data)
+@api.route("/forecast/favorites", methods=["GET"])
+def forecast_all_favorites():
+    user_id = request.args.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    # Find all favorites for the user
+    favorites = list(db["Favorite"].find({"userId": user_id}))
+    if not favorites:
+        return jsonify({"error": "No favorites found"}), 404
 
     current_year = 2025
-    print("Model contains forecast up to year:", max(model.keys()))
+    results = []
 
-    forecast = []
-    for i in range(1, 6):  # Predict next 5 years
-        future_year = str(current_year + i)
-        price = model.get(future_year)
+    for fav in favorites:
+        base_price = fav.get("price")
+        if not base_price:
+            continue  # Skip if no price is stored
 
-        if price is not None:
-            forecast.append({
-                "date": future_year,
-                "price": round(price, 2)
-            })
-        else:
-            print(f"No forecast found for year {future_year} in model")
+        forecast = []
+        for i in range(1, 6):  # Predict next 5 years
+            year = str(current_year + i)
+            if year in model:
+                forecast.append({
+                    "date": year,
+                    "price": round(base_price * (model[year] / list(model.values())[0]), 2)
+                })
 
-    if not forecast:
-        print("Forecast array is EMPTY. Double-check model contents.")
+        results.append({
+            "home": {
+                "zpid": fav.get("zpid"),
+                "title": fav.get("title"),
+                "city": fav.get("city"),
+                "price": base_price,
+                "bedrooms": fav.get("bedrooms"),
+                "bathrooms": fav.get("bathrooms"),
+                "image": fav.get("image")
+            },
+            "forecast": forecast
+        })
 
-    return jsonify({
-        "forecast": forecast,
-        "confidence": 75
-    })
+    return jsonify({"forecasts": results})
+
 
 
 
@@ -247,162 +263,142 @@ def chat():
 @api.route("/search", methods=["GET"])
 def search_homes():
     query = request.args.get("q", "").strip()
-    
     if not query:
         return jsonify({"results": []})
-    
+
+    RAPIDAPI_KEY = os.getenv("ZILLOW_API_KEY")
+    if not RAPIDAPI_KEY:
+        return jsonify({"error": "ZILLOW_API_KEY not configured"}), 500
+
+    headers = {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": "zillow-com1.p.rapidapi.com"
+    }
+
+    url = "https://zillow-com1.p.rapidapi.com/propertyExtendedSearch"
+    params = {
+        "location": query,
+        "status_type": "ForSale",   # Or "ForRent" if you want rentals
+        "home_type": "Houses"       # Optional: can remove if you want all types
+    }
+
     try:
-        # Search for homes by title, city, or address (case-insensitive)
-        homes = db["Home"].find({
-            "$or": [
-                {"title": {"$regex": query, "$options": "i"}},
-                {"city": {"$regex": query, "$options": "i"}},
-                {"address": {"$regex": query, "$options": "i"}}
-            ]
-        })
-        
+        resp = requests.get(url, headers=headers, params=params)
+        data = resp.json()
+
+        import json
+        print("RAW ZILLOW RESPONSE:")
+        print(json.dumps(data, indent=2))
+
+
+        # Directly get props array
+        items = data.get("props", [])
         results = []
-        for home in homes:
-            # Convert ObjectId to string for JSON serialization
-            home["_id"] = str(home["_id"])
-            home["listedById"] = str(home["listedById"])
-            
-            # Map the fields to match what the frontend expects
-            result = {
-                "id": home["_id"],
-                "title": home["title"],
-                "city": home.get("city", home.get("address", "Unknown")),
-                "price": home["price"],
-                "bedrooms": home.get("bedrooms", 0),
-                "bathrooms": home.get("bathrooms", 0),
-                "image": home.get("image")
-            }
-            results.append(result)
-        
+
+        for item in items:
+            results.append({
+                "id": str(item.get("zpid", "")),
+                "title": item.get("address", "").split(",")[0] if item.get("address") else "Unknown",
+                "city": extract_city(item.get("address", "")),
+                "price": item.get("price", 0),
+                "bedrooms": item.get("bedrooms", 0),
+                "bathrooms": item.get("bathrooms", 0),
+                "image": item.get("imgSrc")
+            })
+
         return jsonify({"results": results})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+def extract_city(address):
+    """Extract city from Zillow's address string."""
+    try:
+        parts = address.split(",")
+        return parts[1].strip() if len(parts) > 1 else "Unknown"
+    except Exception:
+        return "Unknown"
+
+def parse_property_summary(item):
+    """Map Zillow search result to our frontend format."""
+    return {
+        "id": str(item.get("zpid", "")),
+        "title": item.get("address", "").split(",")[0] if item.get("address") else "Unknown",
+        "city": extract_city(item.get("address", "")),
+        "price": item.get("price", 0),
+        "bedrooms": item.get("bedrooms", 0),
+        "bathrooms": item.get("bathrooms", 0),
+        "image": item.get("imgSrc", None)
+    }
+
+def parse_property_detail(data):
+    """Map Zillow single property detail to our frontend format."""
+    return {
+        "id": str(data.get("zpid", "")),
+        "title": data.get("address", "").split(",")[0] if data.get("address") else "Unknown",
+        "city": extract_city(data.get("address", "")),
+        "price": data.get("price", 0),
+        "bedrooms": data.get("bedrooms", 0),
+        "bathrooms": data.get("bathrooms", 0),
+        "image": (data.get("imgSrc") or 
+                  (data.get("photos", [{}])[0].get("url") if data.get("photos") else None))
+    }
+
+
+# ------ Favorites ------
+
+@api.route("/favorites", methods=["POST"])
+def add_favorite():
+    data = request.get_json()
+    user_id = data.get("userId")
+    zpid = data.get("zpid")
+
+    if not user_id or not zpid:
+        return jsonify({"error": "userId and zpid are required"}), 400
+
+    # Prevent duplicates
+    existing = db["Favorite"].find_one({"userId": user_id, "zpid": zpid})
+    if existing:
+        return jsonify({"message": "Already favorited"}), 200
+
+    favorite_doc = {
+        "userId": user_id,
+        "zpid": zpid,
+        "title": data.get("title"),
+        "city": data.get("city"),
+        "price": data.get("price"),
+        "bedrooms": data.get("bedrooms"),
+        "bathrooms": data.get("bathrooms"),
+        "image": data.get("image")
+    }
+    db["Favorite"].insert_one(favorite_doc)
+    return jsonify({"message": "Favorite added"}), 201
+
+
+@api.route("/favorites", methods=["GET"])
+def get_favorites():
+    user_id = request.args.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId required"}), 400
+
+    cursor = db["Favorite"].find({"userId": user_id})
+    results = []
+    for fav in cursor:
+        fav["_id"] = str(fav["_id"])
+        results.append(fav)
     
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # Always return 200 with an empty array instead of 404
+    return jsonify({"favorites": results})
 
-# ------ ADD SAMPLE HOMES (for testing) ------
-@api.route("/homes/sample", methods=["POST"])
-def add_sample_homes():
-    try:
-        # First, check if we have any users to assign homes to
-        users = list(db["User"].find())
-        if not users:
-            return jsonify({"error": "No users found. Create a user first."}), 400
-        
-        user_id = users[0]["_id"]  # Use the first user
-        
-        sample_homes = [
-            {
-                "title": "Modern Condo in Miami",
-                "address": "123 Ocean Drive, Miami, FL",
-                "city": "Miami",
-                "price": 1800,
-                "bedrooms": 2,
-                "bathrooms": 2,
-                "image": "https://via.placeholder.com/400x300",
-                "description": "Beautiful modern condo with ocean view",
-                "listedById": user_id
-            },
-            {
-                "title": "Cozy Apartment in Chicago",
-                "address": "456 Michigan Ave, Chicago, IL",
-                "city": "Chicago", 
-                "price": 1400,
-                "bedrooms": 1,
-                "bathrooms": 1,
-                "image": "https://via.placeholder.com/400x300",
-                "description": "Cozy downtown apartment",
-                "listedById": user_id
-            },
-            {
-                "title": "House in LA",
-                "address": "789 Sunset Blvd, Los Angeles, CA",
-                "city": "Los Angeles",
-                "price": 2200,
-                "bedrooms": 3,
-                "bathrooms": 2,
-                "image": "https://via.placeholder.com/400x300", 
-                "description": "Spacious house in LA",
-                "listedById": user_id
-            },
-            {
-                "title": "Downtown Loft in New York",
-                "address": "101 Broadway, New York, NY",
-                "city": "New York",
-                "price": 3500,
-                "bedrooms": 2,
-                "bathrooms": 1,
-                "image": "https://via.placeholder.com/400x300",
-                "description": "Modern loft in Manhattan",
-                "listedById": user_id
-            },
-            {
-                "title": "Beach House in San Diego",
-                "address": "555 Coastal Blvd, San Diego, CA",
-                "city": "San Diego",
-                "price": 2800,
-                "bedrooms": 4,
-                "bathrooms": 3,
-                "image": "https://via.placeholder.com/400x300",
-                "description": "Beautiful beachfront property",
-                "listedById": user_id
-            }
-        ]
-        
-        # Insert sample homes
-        result = db["Home"].insert_many(sample_homes)
-        return jsonify({
-            "message": f"Added {len(result.inserted_ids)} sample homes",
-            "ids": [str(id) for id in result.inserted_ids]
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
-# ------ GET ALL HOMES ------
-@api.route("/homes", methods=["GET"])
-def get_all_homes():
-    try:
-        homes = db["Home"].find()
-        results = []
-        
-        for home in homes:
-            # Convert ObjectId to string for JSON serialization
-            home["_id"] = str(home["_id"])
-            home["listedById"] = str(home["listedById"])
-            
-            # Map the fields to match what the frontend expects
-            result = {
-                "id": home["_id"],
-                "title": home["title"],
-                "city": home.get("city", home.get("address", "Unknown")),
-                "price": home["price"],
-                "bedrooms": home.get("bedrooms", 0),
-                "bathrooms": home.get("bathrooms", 0),
-                "image": home.get("image")
-            }
-            results.append(result)
-        
-        return jsonify({"results": results})
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
-@api.route("/listings/<listing_id>", methods=["DELETE"])
-def delete_listing(listing_id):
+@api.route("/favorites/<fav_id>", methods=["DELETE"])
+def remove_favorite(fav_id):
     try:
-        result = db["listings"].delete_one({"_id": ObjectId(listing_id)})
+        result = db["Favorite"].delete_one({"_id": ObjectId(fav_id)})
         if result.deleted_count == 0:
-            return jsonify({"error": "Listing not found"}), 404
-
-        # Cascade delete related data
-        db["favorites"].delete_many({"listingId": listing_id})
-        db["Task"].delete_many({"userId": listing_id})  # adjust if tasks are linked differently
-
-        return jsonify({"message": "Listing and related favorites and tasks deleted"}), 200
+            return jsonify({"error": "Favorite not found"}), 404
+        return jsonify({"message": "Favorite removed"}), 200
     except Exception as e:
-        return jsonify({"error": f"Invalid listing ID or delete failed: {str(e)}"}), 400
+        return jsonify({"error": str(e)}), 400
