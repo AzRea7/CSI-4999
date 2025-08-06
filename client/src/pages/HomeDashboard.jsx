@@ -9,8 +9,8 @@ const HomeDashboard = () => {
   const [years, setYears] = useState("");
   const [monthlyPayment, setMonthlyPayment] = useState(null);
 
-  const [favorites, setFavorites] = useState([]);   // Favorited homes
-  const [tasks, setTasks] = useState([]);           // Current tasks
+  const [favorites, setFavorites] = useState([]);
+  const [tasks, setTasks] = useState([]);   
 
   const USER_ID = user?.id;
 
@@ -29,16 +29,16 @@ useEffect(() => {
   // Get favorited homes for the user (✅ use /api/favorites now)
   axios
     .get("http://localhost:5000/api/favorites", {
-      params: { userId: USER_ID }, // must match what backend expects
+      params: { userId: USER_ID },
     })
     .then((res) => setFavorites(res.data.favorites || []))
     .catch((err) => {
       console.error("Failed to fetch favorite homes:", err);
-      setFavorites([]); // Set to empty array on error
+      setFavorites([]);
     });
 }, [user?.id]);
 
-  // Handle mortgage calculation form submission
+
   const handleCalculate = (e) => {
     e.preventDefault();
     const P = parseFloat(principal);
@@ -47,7 +47,6 @@ useEffect(() => {
     if (!isNaN(P) && !isNaN(annualInterest) && !isNaN(n) && P > 0 && n > 0) {
       let monthly;
       if (annualInterest === 0) {
-        // If interest rate is 0%, simple division
         monthly = P / n;
       } else {
         const r = annualInterest / 12;  // monthly interest rate (decimal)
@@ -62,13 +61,29 @@ useEffect(() => {
   const handleComplete = async (taskId) => {
     try {
       await axios.delete(`http://localhost:5000/api/tasks/${taskId}`);
-      // Update local tasks state by filtering out the completed task
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
     } catch (err) {
       console.error("Failed to complete task:", err);
     }
   };
+  const toggleFavorite = async (home) => {
+  if (!user?.id) {
+    alert("Please log in to manage favorites.");
+    return;
+  }
 
+  try {
+    await axios.delete(
+      `http://localhost:5000/api/favorites/${home._id}`
+    );
+    const res = await axios.get("http://localhost:5000/api/favorites", {
+      params: { userId: user.id },
+    });
+    setFavorites(res.data.favorites || []);
+  } catch (err) {
+    console.error("Failed to unfavorite:", err);
+  }
+};
   return (
     <div className="px-6 py-10 max-w-5xl mx-auto bg-white min-h-screen">
       {/* Dashboard Heading */}
