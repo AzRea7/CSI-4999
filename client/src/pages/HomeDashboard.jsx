@@ -213,9 +213,16 @@ useEffect(() => {
             <p className="text-xs text-gray-500">
               {home.bedrooms} bed / {home.bathrooms} bath
             </p>
+            <button
+              className="text-sm mt-2 text-blue-600 hover:underline"
+              onClick={() => toggleFavorite(home)}
+            >
+              ★ Unfavorite
+            </button>
           </div>
         </div>
       ))}
+      
     </div>
   ) : (
     <p className="text-gray-600">You have no favorited homes yet.</p>
