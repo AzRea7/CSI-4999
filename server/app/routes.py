@@ -425,3 +425,16 @@ def forecast_home():
         "forecast": forecast,
         "confidence": f"{model.get('confidence', 95)}%"
     })
+@api.route("/homes", methods=["GET"])
+def get_homes():
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Missing user_id"}), 400
+
+    homes_cursor = db["Home"].find({"listedById": user_id})
+    homes = []
+    for home in homes_cursor:
+        home["_id"] = str(home["_id"])
+        homes.append(home)
+
+    return jsonify({"homes": homes})
