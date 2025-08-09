@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from statsmodels.tsa.arima.model import ARIMA
 from joblib import dump
+import numpy as np
 
 # Constants
 DATASET_ID = "prevek18/ames-housing-dataset"
@@ -20,25 +21,41 @@ def load_data(filepath):
     return df
 
 def train_arima(df):
-    # Aggregate average price per year
     yearly = df.groupby("year")["price"].mean()
-    
-    print("Yearly averages:")
-    print(yearly)
 
-    # Train ARIMA model (simple ARIMA(1,1,1))
-    model = ARIMA(yearly, order=(1, 1, 1))
+    smoothed = yearly.ewm(span=3).mean()
+    log_prices = np.log(smoothed)
+
+    print("Smoothed log-transformed average prices:")
+    print(log_prices)
+
+    # Fit ARIMA on smoothed log prices
+    model = ARIMA(log_prices, order=(1, 1, 1))
     fitted_model = model.fit()
 
-    # Forecast next 20 years
-    FUTURE_YEARS = 20  # Forecast 20 years beyond last year in dataset
-    future = fitted_model.forecast(steps=FUTURE_YEARS)
+    # Forecast 20 years
+    FUTURE_YEARS = 20
+    forecast_log = fitted_model.get_forecast(steps=FUTURE_YEARS)
+    forecast_values = forecast_log.predicted_mean
+    conf_int = forecast_log.conf_int()
+
+    future = np.exp(forecast_values)
+    lower = np.exp(conf_int.iloc[:, 0])
+    upper = np.exp(conf_int.iloc[:, 1])
+
     future_years = list(range(yearly.index.max() + 1, yearly.index.max() + 1 + FUTURE_YEARS))
 
-    forecast = {str(year): round(price, 2) for year, price in zip(future_years, future)}
-    print("📈 Forecast:", forecast)
+    forecast_dict = {
+        "forecast": {str(y): round(p, 2) for y, p in zip(future_years, future)},
+        "lower": {str(y): round(p, 2) for y, p in zip(future_years, lower)},
+        "upper": {str(y): round(p, 2) for y, p in zip(future_years, upper)},
+        "confidence": 95
+    }
 
-    return forecast
+    print("Forecast with Smoothing + Confidence Interval:")
+    print(forecast_dict)
+
+    return forecast_dict
 
 def main():
     path = download_dataset()
