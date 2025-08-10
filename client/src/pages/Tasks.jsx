@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-
-const USER_ID = "demo-user-id-123";
+import { useAuth } from "../AuthContext";
 
 const Tasks = () => {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [creditScore, setCreditScore] = useState("");
   const [refinanceInfo, setRefinanceInfo] = useState("");
@@ -11,38 +11,43 @@ const Tasks = () => {
   const [housePrice, setHousePrice] = useState("");
 
   useEffect(() => {
-  axios
-    .get(`${import.meta.env.VITE_API_URL}/tasks`, {
-      params: { user_id: USER_ID },
-    })
-    .then((res) => {
-      console.log("API /tasks response:", res.data);
-      setTasks(res.data.tasks || []); // <= fallback to empty array
-    })
-    .catch((err) => {
-      console.error("Failed to fetch tasks:", err);
-      setTasks([]); // fallback on error
-    });
-}, []);
+    if (!user?.id) return;
 
+    axios
+      .get(`${import.meta.env.VITE_API_URL}/tasks`, {
+        params: { user_id: user.id },
+      })
+      .then((res) => {
+        console.log("API /tasks response:", res.data);
+        setTasks(res.data.tasks || []);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch tasks:", err);
+        setTasks([]);
+      });
+  }, [user?.id]);
 
   const handleGenerate = (e) => {
     e.preventDefault();
 
+    if (!user?.id) return;
+
     const fullInfo = `${
       refinanceInfo || "not refinancing"
-    }. The house is titled '${houseTitle}' and priced at $${
-      housePrice || "N/A"
-    }.`;
+    }. The house is titled '${houseTitle}' and priced at $${housePrice || "N/A"}.`;
 
     axios
       .post(`${import.meta.env.VITE_API_URL}/tasks/generate`, {
-        user_id: USER_ID,
+        user_id: user.id,
         credit_score: creditScore,
         refinancing_info: fullInfo,
       })
-      .then((res) => setTasks(res.data.tasks))
-      .catch((err) => console.error("Task generation failed:", err));
+      .then((res) => {
+        setTasks(res.data.tasks || []);
+      })
+      .catch((err) => {
+        console.error("Task generation failed:", err);
+      });
   };
 
   const handleComplete = async (taskId) => {
@@ -63,7 +68,7 @@ const Tasks = () => {
       <form
         onSubmit={handleGenerate}
         onKeyDown={(e) => {
-          if (e.key === "Enter") e.preventDefault(); // Prevent Enter from submitting
+          if (e.key === "Enter") e.preventDefault();
         }}
         className="grid md:grid-cols-2 gap-6 mb-12 bg-gray-50 p-6 rounded-2xl shadow-sm"
       >
@@ -143,14 +148,14 @@ const Tasks = () => {
               </h3>
               <div className="text-sm text-gray-600 space-y-1">
                 <p>
-                  <strong> Category:</strong>{" "}
+                  <strong>Category:</strong>{" "}
                   <span className="capitalize">{task.category}</span>
                 </p>
                 <p>
-                  <strong> Due Date:</strong> {task.due_date}
+                  <strong>Due Date:</strong> {task.due_date}
                 </p>
                 <p>
-                  <strong> Priority:</strong>{" "}
+                  <strong>Priority:</strong>{" "}
                   <span
                     className={
                       task.priority === "high"
@@ -166,7 +171,7 @@ const Tasks = () => {
               </div>
             </div>
 
-            {!task.completed && (
+            {!task.completed ? (
               <div className="absolute bottom-4 right-4">
                 <button
                   onClick={() => handleComplete(task.id)}
@@ -175,8 +180,7 @@ const Tasks = () => {
                   Mark Complete
                 </button>
               </div>
-            )}
-            {task.completed && (
+            ) : (
               <div className="absolute bottom-4 right-4 text-green-500 text-sm font-bold">
                 ✔️ Completed
               </div>
