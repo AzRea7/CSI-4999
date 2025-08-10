@@ -156,6 +156,15 @@ def register_user():
 
     return jsonify({"id": str(result.inserted_id), "email": email}), 201
 
+@api.route('/init-text-index', methods=['POST'])
+def create_text_index():
+    db.homes.create_index([
+        ('title', 'text'),
+        ('description', 'text'),
+        ('address', 'text'),
+    ])
+    return jsonify({'message': 'Text index created'}), 200
+
 
 # app/routes.py
 @api.route("/users", methods=["GET"])
