@@ -486,3 +486,37 @@ def forecast_favorited_homes():
         })
 
     return jsonify({"forecast": forecasts})
+
+@api.route("/forecast", methods=["POST"])
+def forecast_home():
+    data = request.get_json()
+    area = data.get("area")
+    bedrooms = data.get("bedrooms")
+    bathrooms = data.get("bathrooms")
+    price = data.get("price")
+
+    if None in (area, bedrooms, bathrooms, price):
+        return jsonify({"error": "Missing required home data"}), 400
+
+    current_year = 2025
+    base_year = list(model["forecast"].values())[0]
+    forecast = []
+
+    for i in range(1, 6):
+        year = str(current_year + i)
+        if year in model["forecast"]:
+            scale = model["forecast"][year] / base_year
+            min_scale = model["lower"][year] / base_year
+            max_scale = model["upper"][year] / base_year
+
+            forecast.append({
+                "date": year,
+                "price": round(price * scale, 2),
+                "min": round(price * min_scale, 2),
+                "max": round(price * max_scale, 2),
+            })
+
+    return jsonify({
+        "forecast": forecast,
+        "confidence": f"{model.get('confidence', 95)}%"
+    })
