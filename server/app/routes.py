@@ -438,3 +438,51 @@ def get_homes():
         homes.append(home)
 
     return jsonify({"homes": homes})
+
+# ------ FORECAST ------
+@api.route("/forecast/favorites", methods=["GET"])
+def forecast_favorited_homes():
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Missing user_id"}), 400
+
+    favorites = list(db["Favorite"].find({"userId": user_id}))
+    if not favorites:
+        return jsonify({"forecast": []})
+
+    current_year = 2025
+    base_year = list(model["forecast"].values())[0]
+    forecasts = []
+
+    for fav in favorites:
+        base_price = fav.get("price")
+        if base_price is None:
+            print(f"Skipping favorite without price: {fav}")
+            continue
+
+        forecast = []
+        for i in range(1, 6):
+            year = str(current_year + i)
+            if year in model["forecast"]:
+                scale = model["forecast"][year] / base_year
+                min_scale = model["lower"][year] / base_year
+                max_scale = model["upper"][year] / base_year
+
+                forecast.append({
+                    "date": year,
+                    "price": round(base_price * scale, 2),
+                    "min": round(base_price * min_scale, 2),
+                    "max": round(base_price * max_scale, 2),
+                })
+
+        forecasts.append({
+            "home": {
+                "_id": str(fav.get("_id", "")),
+                "title": fav.get("title", "Untitled"),
+                "price": base_price
+            },
+            "forecast": forecast,
+            "confidence": f"{model.get('confidence', 95)}%"
+        })
+
+    return jsonify({"forecast": forecasts})
