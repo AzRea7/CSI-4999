@@ -27,6 +27,9 @@ const Navbar = () => {
               <Link to="/chatbot" className="hover:text-red-500 transition">
                 ChatBot
               </Link>
+              <Link to="/analytics" className="hover:text-red-500 transition">
+                Analytics
+              </Link>
             </div>
           )}
         </div>

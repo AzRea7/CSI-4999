@@ -156,6 +156,15 @@ def register_user():
 
     return jsonify({"id": str(result.inserted_id), "email": email}), 201
 
+@api.route('/init-text-index', methods=['POST'])
+def create_text_index():
+    db.homes.create_index([
+        ('title', 'text'),
+        ('description', 'text'),
+        ('address', 'text'),
+    ])
+    return jsonify({'message': 'Text index created'}), 200
+
 
 # app/routes.py
 @api.route("/users", methods=["GET"])
@@ -362,7 +371,7 @@ def forecast_favorited_homes():
     for fav in favorites:
         base_price = fav.get("price")
         if base_price is None:
-            print(f"Skipping favorite without price: {fav}")
+            # No price, skip this favorite
             continue
 
         forecast = []
@@ -392,100 +401,6 @@ def forecast_favorited_homes():
 
     return jsonify({"forecast": forecasts})
 
-@api.route("/forecast", methods=["POST"])
-def forecast_home():
-    data = request.get_json()
-    area = data.get("area")
-    bedrooms = data.get("bedrooms")
-    bathrooms = data.get("bathrooms")
-    price = data.get("price")
-
-    if None in (area, bedrooms, bathrooms, price):
-        return jsonify({"error": "Missing required home data"}), 400
-
-    current_year = 2025
-    base_year = list(model["forecast"].values())[0]
-    forecast = []
-
-    for i in range(1, 6):
-        year = str(current_year + i)
-        if year in model["forecast"]:
-            scale = model["forecast"][year] / base_year
-            min_scale = model["lower"][year] / base_year
-            max_scale = model["upper"][year] / base_year
-
-            forecast.append({
-                "date": year,
-                "price": round(price * scale, 2),
-                "min": round(price * min_scale, 2),
-                "max": round(price * max_scale, 2),
-            })
-
-    return jsonify({
-        "forecast": forecast,
-        "confidence": f"{model.get('confidence', 95)}%"
-    })
-@api.route("/homes", methods=["GET"])
-def get_homes():
-    user_id = request.args.get("user_id")
-    if not user_id:
-        return jsonify({"error": "Missing user_id"}), 400
-
-    homes_cursor = db["Home"].find({"listedById": user_id})
-    homes = []
-    for home in homes_cursor:
-        home["_id"] = str(home["_id"])
-        homes.append(home)
-
-    return jsonify({"homes": homes})
-
-# ------ FORECAST ------
-@api.route("/forecast/favorites", methods=["GET"])
-def forecast_favorited_homes():
-    user_id = request.args.get("user_id")
-    if not user_id:
-        return jsonify({"error": "Missing user_id"}), 400
-
-    favorites = list(db["Favorite"].find({"userId": user_id}))
-    if not favorites:
-        return jsonify({"forecast": []})
-
-    current_year = 2025
-    base_year = list(model["forecast"].values())[0]
-    forecasts = []
-
-    for fav in favorites:
-        base_price = fav.get("price")
-        if base_price is None:
-            print(f"Skipping favorite without price: {fav}")
-            continue
-
-        forecast = []
-        for i in range(1, 6):
-            year = str(current_year + i)
-            if year in model["forecast"]:
-                scale = model["forecast"][year] / base_year
-                min_scale = model["lower"][year] / base_year
-                max_scale = model["upper"][year] / base_year
-
-                forecast.append({
-                    "date": year,
-                    "price": round(base_price * scale, 2),
-                    "min": round(base_price * min_scale, 2),
-                    "max": round(base_price * max_scale, 2),
-                })
-
-        forecasts.append({
-            "home": {
-                "_id": str(fav.get("_id", "")),
-                "title": fav.get("title", "Untitled"),
-                "price": base_price
-            },
-            "forecast": forecast,
-            "confidence": f"{model.get('confidence', 95)}%"
-        })
-
-    return jsonify({"forecast": forecasts})
 
 @api.route("/forecast", methods=["POST"])
 def forecast_home():
@@ -521,6 +436,7 @@ def forecast_home():
         "confidence": f"{model.get('confidence', 95)}%"
     })
 
+
 @api.route("/homes", methods=["GET"])
 def get_homes():
     user_id = request.args.get("user_id")
@@ -534,3 +450,59 @@ def get_homes():
         homes.append(home)
 
     return jsonify({"homes": homes})
+
+
+# ------ Favorites ------
+@api.route("/favorites", methods=["POST"])
+def add_favorite():
+    data = request.get_json()
+    user_id = data.get("userId")
+    zpid = data.get("zpid")
+
+    if not user_id or not zpid:
+        return jsonify({"error": "userId and zpid are required"}), 400
+
+    # Prevent duplicates
+    existing = db["Favorite"].find_one({"userId": user_id, "zpid": zpid})
+    if existing:
+        return jsonify({"message": "Already favorited"}), 200
+
+    favorite_doc = {
+        "userId": user_id,
+        "zpid": zpid,
+        "title": data.get("title"),
+        "city": data.get("city"),
+        "price": data.get("price"),
+        "bedrooms": data.get("bedrooms"),
+        "bathrooms": data.get("bathrooms"),
+        "image": data.get("image")
+    }
+    db["Favorite"].insert_one(favorite_doc)
+    return jsonify({"message": "Favorite added"}), 201
+
+
+@api.route("/favorites", methods=["GET"])
+def get_favorites():
+    user_id = request.args.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId required"}), 400
+
+    cursor = db["Favorite"].find({"userId": user_id})
+    results = []
+    for fav in cursor:
+        fav["_id"] = str(fav["_id"])
+        results.append(fav)
+
+    # Always return 200 with an empty array instead of 404
+    return jsonify({"favorites": results})
+
+
+@api.route("/favorites/<fav_id>", methods=["DELETE"])
+def remove_favorite(fav_id):
+    try:
+        result = db["Favorite"].delete_one({"_id": ObjectId(fav_id)})
+        if result.deleted_count == 0:
+            return jsonify({"error": "Favorite not found"}), 404
+        return jsonify({"message": "Favorite removed"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

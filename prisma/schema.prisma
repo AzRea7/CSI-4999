@@ -16,18 +16,26 @@ model User {
   tasks           Task[]
   recentlyViewed  RecentlyViewed[]
   createdAt       DateTime         @default(now())
+  updatedAt DateTime @updatedAt
+
 }
 
 model Home {
   id               String           @id @default(auto()) @map("_id") @db.ObjectId
   title            String
   address          String
+  city             String?
   price            Int
+  bedrooms         Int?
+  bathrooms        Int?
+  image            String?
   description      String?
   listedBy         User             @relation(fields: [listedById], references: [id])
   listedById       String           @db.ObjectId
   recentlyViewedBy RecentlyViewed[]
   createdAt        DateTime         @default(now())
+  updatedAt DateTime @updatedAt
+
 }
 
 model Task {
@@ -37,6 +45,8 @@ model Task {
   userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
 }
 
 model RecentlyViewed {
